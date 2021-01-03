@@ -42,6 +42,10 @@
 #include "waves.hpp"
 
 static Waves s_waves;
+static float pitch;
+static float steps[128];
+static int currentStep = 0;
+static int stepLength = 0;
 
 void OSC_INIT(uint32_t platform, uint32_t api)
 {
@@ -62,7 +66,7 @@ void OSC_CYCLE(const user_osc_param_t * const params,
     const uint32_t flags = s.flags;
     s.flags = Waves::k_flags_none;
     
-    s_waves.updatePitch(osc_w0f_for_note((params->pitch)>>8, params->pitch & 0xFF));
+    s_waves.updatePitch(pitch);
     
     s_waves.updateWaves(flags);
     
@@ -70,12 +74,6 @@ void OSC_CYCLE(const user_osc_param_t * const params,
       s.reset();
     
     s.lfo = q31_to_f32(params->shape_lfo);
-
-    if (flags & Waves::k_flag_bitcrush) {
-      s.dither = p.bitcrush * 2e-008f;
-      s.bitres = osc_bitresf(p.bitcrush);
-      s.bitresrcp = 1.f / s.bitres;
-    }
   }
   
   // Temporaries.
@@ -85,11 +83,6 @@ void OSC_CYCLE(const user_osc_param_t * const params,
 
   float lfoz = s.lfoz;
   const float lfo_inc = (s.lfo - lfoz) / frames;
-  
-  const float ditheramt = p.bitcrush * 2e-008f;
-  
-  const float bitres = osc_bitresf(p.bitcrush);
-  const float bitres_recip = 1.f / bitres;
 
   const float submix = p.submix;
   const float ringmix = p.ringmix;
@@ -114,7 +107,6 @@ void OSC_CYCLE(const user_osc_param_t * const params,
     
     sig = prelpf.process_fo(sig);
     sig += s.dither * osc_white();
-    sig = si_roundf(sig * s.bitres) * s.bitresrcp;
     sig = postlpf.process_fo(sig);
     sig = osc_softclipf(0.125f, sig);
     
@@ -138,6 +130,29 @@ void OSC_CYCLE(const user_osc_param_t * const params,
 void OSC_NOTEON(const user_osc_param_t * const params)
 {
   s_waves.state.flags |= Waves::k_flag_reset;
+
+  
+  const Waves::Params &p = s_waves.params;
+
+  if (p.play_mode) {
+    if (stepLength > 0) {
+      pitch = steps[currentStep];
+      currentStep = (currentStep + 1) % stepLength;
+    } else {
+      pitch = 0.0f;
+    }
+  } else {
+    pitch = osc_w0f_for_note((params->pitch)>>8, params->pitch & 0xFF);
+    steps[currentStep] = pitch;
+    if (currentStep == 0) {
+      stepLength = 0;
+    }
+    if (stepLength < 128) {
+      stepLength++;
+    }
+    currentStep = (currentStep + 1) % 128;
+  }
+
 }
 
 void OSC_NOTEOFF(const user_osc_param_t * const params)
@@ -191,10 +206,15 @@ void OSC_PARAM(uint16_t index, uint16_t value)
     break;
     
   case k_user_osc_param_id6:
-    // bit crush
+    // play_mode
     // percent parameter
-    p.bitcrush = clip01f(value * 0.01f);
-    s.flags |= Waves::k_flag_bitcrush;
+    if (clip01f(value) > 0) {
+      p.play_mode = true;
+    } else {
+      p.play_mode = false;
+      currentStep = 0;
+    }
+
     break;
     
   case k_user_osc_param_shape:

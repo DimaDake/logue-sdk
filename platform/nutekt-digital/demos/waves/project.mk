@@ -2,7 +2,7 @@
 # Project Customization
 # #############################################################################
 
-PROJECT = waves
+PROJECT = step_waves
 
 UCSRC = 
 

@@ -50,14 +50,13 @@ struct Waves {
     k_flag_wave1    = 1<<2,
     k_flag_subwave  = 1<<3,
     k_flag_ringmix  = 1<<4,
-    k_flag_bitcrush = 1<<5,
     k_flag_reset    = 1<<6
   };
   
   struct Params {
     float    submix;
     float    ringmix;
-    float    bitcrush;
+    bool     play_mode;
     float    shape;
     float    shiftshape;
     uint8_t  wave0;
@@ -68,7 +67,7 @@ struct Waves {
     Params(void) :
       submix(0.05f),
       ringmix(0.f),
-      bitcrush(0.f),
+      play_mode(false),
       shape(0.f),
       shiftshape(0.f),
       wave0(0),
@@ -90,8 +89,6 @@ struct Waves {
           float    lfo;
           float    lfoz;
           float    dither;
-          float    bitres;
-          float    bitresrcp;
           float    imperfection;
           uint32_t flags:8;
     
@@ -105,8 +102,6 @@ struct Waves {
       lfo(0.f),
       lfoz(0.f),
       dither(0.f),
-      bitres(1.f),
-      bitresrcp(1.f),
       flags(k_flags_none)
     {
       reset();
